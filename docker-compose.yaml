@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  
+  loki:
+    container_name: loki
+    hostname: loki
+    image: grafana/loki
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki:/etc/loki/
+  
+  promtail:
+    container_name: promtail
+    hostname: promtail
+    image: grafana/promtail
+    command: -config.file=/etc/promtail/docker-config.yaml
+    volumes:
+      - ./promtail/docker-config.yaml:/etc/promtail/docker-config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - loki
+
+  grafana:
+    container_name: grafana
+    hostname: grafana
+    image: grafana/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    depends_on:
+      - promtail
+
+  app:
+    container_name: app
+    hostname: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    labels:
+      logging: "promtail"
+      logging_jobname: "container_logs"
+    depends_on:
+      - grafana
